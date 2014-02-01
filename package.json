@@ -1,0 +1,30 @@
+{
+  "name": "mimosa-require-deps",
+  "version": "0.1.0",
+  "homepage": "https://github.com/brzpegasus/mimosa-require-deps",
+  "author": "Estelle DeBlois",
+  "description": "",
+  "contributors": [
+    {
+      "name": "Estelle DeBlois",
+      "email": "edeblois@gmail.com"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/brzpegasus/mimosa-require-deps"
+  },
+  "keywords": [
+    "mimosa",
+    "mmodule",
+    "requirejs"
+  ],
+  "dependencies": {
+    "logmimosa": "0.6.0"
+  },
+  "license": "MIT",
+  "main": "./src",
+  "engines": {
+    "node": ">=0.10"
+  }
+}
