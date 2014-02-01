@@ -2,13 +2,16 @@
 
 exports.defaults = function() {
   return {
-    deps: {}
+    requireDeps: {
+      deps: {}
+    }
   };
 };
 
 exports.placeholder = function() {
   return "\t\n\n"+
-         "  # deps: {}\n";
+         "  # requireDeps:\n" +
+         "    # deps: {}\n";
 };
 
 exports.validate = function(mimosaConfig, validators) {
@@ -16,12 +19,11 @@ exports.validate = function(mimosaConfig, validators) {
       config = mimosaConfig.requireDeps;
 
   if (validators.ifExistsIsObject(errors, 'requireDeps config', config)) {
-
     if (validators.ifExistsIsObject(errors, 'requireDeps.deps', config.deps)) {
       Object.keys(config.deps).forEach(function(name) {
         validators.ifExistsIsString(errors, 'requireDeps.deps.' + name, name);
         if (!config.deps[name] instanceof RegExp) {
-          errors.push("requireDeps.deps[' + name + '] must be a regular expression.");
+          errors.push("requireDeps.deps['" + name + "''] must be a regular expression.");
         }
       });
     }
