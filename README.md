@@ -1,4 +1,2 @@
-mimosa-require-deps
+Mimosa Dependency Bundler
 ===================
-
-(wip)

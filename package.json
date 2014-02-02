@@ -1,9 +1,9 @@
 {
-  "name": "mimosa-require-deps",
+  "name": "mimosa-dependency-bundler",
   "version": "0.1.0",
-  "homepage": "https://github.com/brzpegasus/mimosa-require-deps",
+  "homepage": "https://github.com/brzpegasus/mimosa-dependency-bundler",
   "author": "Estelle DeBlois",
-  "description": "",
+  "description": "Bundles multiple AMD modules into a single module for easy import.",
   "contributors": [
     {
       "name": "Estelle DeBlois",
@@ -12,7 +12,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/brzpegasus/mimosa-require-deps"
+    "url": "https://github.com/brzpegasus/mimosa-dependency-bundler"
   },
   "keywords": [
     "mimosa",
@@ -21,6 +21,13 @@
   ],
   "dependencies": {
     "logmimosa": "0.6.0"
+  },
+  "devDependencies": {
+    "mocha": "1.17.1",
+    "chai": "1.9.0"
+  },
+  "scripts": {
+    "test": "mocha"
   },
   "license": "MIT",
   "main": "./src",

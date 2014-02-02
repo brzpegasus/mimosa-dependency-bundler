@@ -1,85 +1,69 @@
 'use strict';
 
-var path = require('path'),
-    fs = require('fs'),
+var fs = require('fs'),
+    path = require('path'),
     config = require('./config'),
     logger = require('logmimosa');
 
-var deps = {},
-    keys = Object.keys;
+var bundler;
 
 var registration = function(mimosaConfig, register) {
-  var jsExt = mimosaConfig.extensions.javascript;
+  var jsExt = mimosaConfig.extensions.javascript,
+      bundlerConfig = mimosaConfig.dependencyBundler;
 
-  register(['add', 'update'], 'afterCompile', _buildDeps, jsExt);
-  register(['remove'], 'afterDelete', _removeDeps, jsExt);
-  register(['buildFile'], 'init', _buildDeps, jsExt);
+  var DependencyBundler = require('./bundler').DependencyBundler;
+  bundler = new DependencyBundler(bundlerConfig);
 
-  register(['add','update'], 'afterWrite', _writeDeps, jsExt);
-  register(['remove'], 'afterWrite', _writeDeps, jsExt);
-  register(['postBuild'], 'init', _writeDeps);
+  register(['add', 'update'], 'afterCompile', _buildDependencies, jsExt);
+  register(['remove'], 'afterDelete', _removeDependencies, jsExt);
+  register(['buildFile'], 'init', _buildDependencies, jsExt);
 
-  register(['preClean'], 'init', _destroyDeps);
+  register(['add','update'], 'afterWrite', _writeBundles, jsExt);
+  register(['remove'], 'afterWrite', _writeBundles, jsExt);
+  register(['postBuild'], 'init', _writeBundles);
+
+  register(['preClean'], 'init', _deleteBundles);
 };
 
-function _buildDeps(mimosaConfig, options, next) {
-  var depsConfig = mimosaConfig.requireDeps && mimosaConfig.requireDeps.deps || {};
-
-  keys(depsConfig).forEach(function(name) {
-    var depFiles = deps[name] = deps[name] || [],
-        depRegex = depsConfig[name];
-
-    options.files.forEach(function(file) {
-      var filename = file.outputFileName;
-      if (depRegex.test(filename)) {
-        if (depFiles.indexOf(filename) < 0) {
-          depFiles.push(filename);
-        }
-      }
-    });
-  });
-
-  next();
-}
-
-function _removeDeps(mimosaConfig, options, next) {
+function _buildDependencies(mimosaConfig, options, next) {
   options.files.forEach(function(file) {
-    var idx, filename = file.outputFileName;
-    keys(deps).forEach(function(name) {
-      if ((idx = deps[name].indexOf(filename)) > -1) {
-        deps[name].splice(idx, 1);
-      }
-    });
+    bundler.processFile(file.outputFileName);
   });
-
   next();
 }
 
-function _writeDeps(mimosaConfig, options, next) {
-  var jsDir = mimosaConfig.watch.compiledJavascriptDir;
+function _removeDependencies(mimosaConfig, options, next) {
+  options.files.forEach(function(file) {
+    bundler.processDeletedFile(file.outputFileName);
+  });
+  next();
+}
 
-  keys(deps).forEach(function(name) {
-    var filename = path.resolve(jsDir, name);
+function _writeBundles(mimosaConfig, options, next) {
+  var baseDir = mimosaConfig.watch.compiledJavascriptDir;
 
-    var modules = deps[name].map(function(dep) {
-      return "  '" + path.relative(jsDir, dep).replace(/\.js$/, '').split(path.sep).join('/') + "'";
+  bundler.bundleNames.forEach(function(name) {
+    var filename = path.resolve(baseDir, name),
+        dependencies = bundler.getBundle(name);
+    var modules = dependencies.map(function(dep) {
+      return "  '" + path.relative(baseDir, dep).replace(/\.js$/, '').split(path.sep).join('/') + "'";
     });
-
     fs.writeFileSync(filename, 'define([\n' + modules.sort().join(',\n') + '\n]);');
   });
 
   next();
 }
 
-function _destroyDeps(mimosaConfig, options, next) {
-  keys(mimosaConfig.requireDeps.deps).forEach(function(name) {
-    var filename = path.resolve(mimosaConfig.watch.compiledJavascriptDir, name);
+function _deleteBundles(mimosaConfig, options, next) {
+  var baseDir = mimosaConfig.watch.compiledJavascriptDir;
+
+  bundler.bundleNames.forEach(function(name) {
+    var filename = path.resolve(baseDir, name);
     if (fs.existsSync(filename)) {
       fs.unlinkSync(filename);
     }
   });
-
-  deps = {};
+  bundler.clearBundles();
 
   next();
 }

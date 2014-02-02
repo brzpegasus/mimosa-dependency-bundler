@@ -2,32 +2,22 @@
 
 exports.defaults = function() {
   return {
-    requireDeps: {
-      deps: {}
+    dependencyBundler: {
+      bundles: []
     }
   };
 };
 
 exports.placeholder = function() {
-  return "\t\n\n"+
-         "  # requireDeps:\n" +
-         "    # deps: {}\n";
+  return "\t\n\n" +
+         "  # dependencyBundler:\n" +
+         "    # bundles: []\n";
 };
 
 exports.validate = function(mimosaConfig, validators) {
-  var errors = [],
-      config = mimosaConfig.requireDeps;
+  var errors = [];
 
-  if (validators.ifExistsIsObject(errors, 'requireDeps config', config)) {
-    if (validators.ifExistsIsObject(errors, 'requireDeps.deps', config.deps)) {
-      Object.keys(config.deps).forEach(function(name) {
-        validators.ifExistsIsString(errors, 'requireDeps.deps.' + name, name);
-        if (!config.deps[name] instanceof RegExp) {
-          errors.push("requireDeps.deps['" + name + "''] must be a regular expression.");
-        }
-      });
-    }
-  }
+  // TODO
 
   return errors;
 };
