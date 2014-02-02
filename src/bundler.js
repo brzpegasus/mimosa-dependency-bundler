@@ -27,7 +27,6 @@ var DependencyBundler = function(options) {
   this.bundles = bundles;
   this.bundleNames = Object.keys(bundles);
   this.patterns = patterns;
-  this.targetDir = options.targetDir || '.';
 };
 
 DependencyBundler.prototype.getBundle = function(name) {
