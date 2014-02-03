@@ -7,7 +7,7 @@ describe('DependencyBundler', function() {
         bundles: [
           {
             name: 'foo.js',
-            dependencies: ['/foo/1/', '/foo/2', 'app/common/']
+            dependencies: ['/foo/1/', '/foo/2', 'app\\common\\']
           },
           {
             name: 'bar.js',
@@ -74,7 +74,12 @@ describe('DependencyBundler', function() {
       expect(fooBundle).to.not.contain(filename);
       expect(barBundle).to.contain(filename);
 
-      filename = 'app/common/shared.js';
+      filename = 'app\\bar_test2.js';
+      bundler.processFile(filename);
+      expect(fooBundle).to.not.contain(filename);
+      expect(barBundle).to.contain(filename);
+
+      filename = 'app\\common\\shared.js';
       bundler.processFile(filename);
       expect(fooBundle).to.contain(filename);
       expect(barBundle).to.contain(filename);

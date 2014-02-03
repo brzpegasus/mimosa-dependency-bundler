@@ -1,12 +1,12 @@
 'use strict';
 
 function fileMatch(filename, patterns) {
+  filename = filename.replace(/\\/g, '/');
+
   return patterns.some(function(pattern) {
     if (pattern instanceof RegExp) {
       return pattern.test(filename);
     } else {
-      filename = filename.replace(/\\/g, '/');
-      pattern = pattern.replace(/\\/g, '/');
       return filename.indexOf(pattern) > -1;
     }
   });
@@ -21,7 +21,9 @@ var DependencyBundler = function(options) {
 
   bundleConfig.forEach(function(bundle) {
     bundles[bundle.name] = [];
-    patterns[bundle.name] = bundle.dependencies;
+    patterns[bundle.name] = bundle.dependencies.map(function(pattern) {
+      return (typeof pattern === 'string') ? pattern.replace(/\\/g, '/') : pattern;
+    });
   });
 
   this.bundles = bundles;
