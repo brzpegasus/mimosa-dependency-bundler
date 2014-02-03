@@ -15,9 +15,16 @@ exports.placeholder = function() {
 };
 
 exports.validate = function(mimosaConfig, validators) {
-  var errors = [];
+  var errors = [],
+      config = mimosaConfig.dependencyBundler;
 
-  // TODO
-
+  if (validators.ifExistsIsObject(errors, 'dependencyBundler config', config)) {
+    if (validators.isArrayOfObjects(errors, 'dependencyBundler.bundles', config.bundles)) {
+      config.bundles.forEach(function(bundle) {
+        validators.ifExistsIsString(errors, 'dependencyBundler.bundles name', bundle.name);
+        validators.isArray(errors, 'dependencyBundler.bundles dependencies', bundle.dependencies);
+      });
+    }
+  }
   return errors;
 };
