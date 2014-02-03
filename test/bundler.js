@@ -28,71 +28,63 @@ describe('DependencyBundler', function() {
     expect(bundler.getBundle('baz.js')).to.not.exist;
   });
 
-  describe('clearBundles', function() {
-    beforeEach(function() {
+  describe('clearBundle', function() {
+    it('clears the list of dependencies for the specified bundle', function() {
       fooBundle.push('app/foo1/a.js', 'app/foo2/a.js');
-      barBundle.push('app/bar/a.js', 'app/bar/b.js', 'app/bar/c.js');
-    });
+      expect(bundler.getBundle('foo.js')).to.have.length(2);
 
-    it('clears the list of dependencies for all bundles', function() {
-      expect(fooBundle).to.have.length(2);
-      expect(barBundle).to.have.length(3);
-
-      bundler.clearBundles();
-      fooBundle = bundler.getBundle('foo.js');
-      barBundle = bundler.getBundle('bar.js');
-
-      expect(fooBundle).to.have.length(0);
-      expect(barBundle).to.have.length(0);
+      bundler.clearBundle('foo.js');
+      expect(bundler.getBundle('foo.js')).to.have.length(0);
     });
   });
 
-  describe('processFile', function() {
-    it('adds a file to the list of dependencies for the matching bundle', function() {
+  describe('addToBundle', function() {
+    it('adds a dependency to the bundle if the it matches the filter criteria', function() {
       var filename;
-
-      expect(fooBundle).to.have.length(0);
-      expect(barBundle).to.have.length(0);
+      var addToBundles = function(name) {
+        bundler.addToBundle('foo.js', name);
+        bundler.addToBundle('bar.js', name);
+      };
 
       filename = 'app/foo/1/a.js';
-      bundler.processFile(filename);
+      addToBundles(filename);
       expect(fooBundle).to.contain(filename);
       expect(barBundle).to.not.contain(filename);
 
       filename = 'app/bar/a.js';
-      bundler.processFile(filename);
+      addToBundles(filename);
       expect(fooBundle).to.not.contain(filename);
       expect(barBundle).to.contain(filename);
 
       filename = 'app/bar.js';
-      bundler.processFile(filename);
+      addToBundles(filename);
       expect(fooBundle).to.not.contain(filename);
       expect(barBundle).to.not.contain(filename);
 
       filename = 'app/bar_test.js';
-      bundler.processFile(filename);
+      addToBundles(filename);
       expect(fooBundle).to.not.contain(filename);
       expect(barBundle).to.contain(filename);
 
       filename = 'app\\bar_test2.js';
-      bundler.processFile(filename);
+      addToBundles(filename);
       expect(fooBundle).to.not.contain(filename);
       expect(barBundle).to.contain(filename);
 
       filename = 'app\\common\\shared.js';
-      bundler.processFile(filename);
+      addToBundles(filename);
       expect(fooBundle).to.contain(filename);
       expect(barBundle).to.contain(filename);
 
       filename = 'a.js';
-      bundler.processFile(filename);
+      addToBundles(filename);
       expect(fooBundle).to.not.contain(filename);
       expect(barBundle).to.not.contain(filename);
     });
   });
 
-  describe('processDeletedFile', function() {
-    beforeEach(function() {
+  describe('removeFromBundle', function() {
+    before(function() {
       fooBundle.push('app/foo/a.js', 'app/common/shared.js');
       barBundle.push('/bar/1/a.js', 'app/common/shared.js');
     });
@@ -101,11 +93,12 @@ describe('DependencyBundler', function() {
       var filename;
 
       filename = 'app/foo/a.js';
-      bundler.processDeletedFile(filename);
+      bundler.removeFromBundle('foo.js', filename);
       expect(fooBundle).to.not.contain(filename);
 
       filename = 'app/common/shared.js';
-      bundler.processDeletedFile(filename);
+      bundler.removeFromBundle('foo.js', filename);
+      bundler.removeFromBundle('bar.js', filename);
       expect(fooBundle).to.not.contain(filename);
       expect(barBundle).to.not.contain(filename);
     });

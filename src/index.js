@@ -1,11 +1,7 @@
 'use strict';
 
-var fs = require('fs'),
-    path = require('path'),
-    config = require('./config'),
-    logger = require('logmimosa');
-
-var bundler;
+var config = require('./config');
+var bundler, targetDir;
 
 var registration = function(mimosaConfig, register) {
   var jsExt = mimosaConfig.extensions.javascript,
@@ -14,12 +10,12 @@ var registration = function(mimosaConfig, register) {
   var DependencyBundler = require('./bundler').DependencyBundler;
   bundler = new DependencyBundler(bundlerConfig);
 
-  register(['add', 'update'], 'afterCompile', _buildDependencies, jsExt);
-  register(['remove'], 'afterDelete', _removeDependencies, jsExt);
-  register(['buildFile'], 'init', _buildDependencies, jsExt);
+  targetDir = mimosaConfig.watch.compiledJavascriptDir;
 
-  register(['add','update'], 'afterWrite', _writeBundles, jsExt);
-  register(['remove'], 'afterWrite', _writeBundles, jsExt);
+  register(['add'], 'afterCompile', _buildDependencies, jsExt);
+  register(['remove'], 'afterDelete', _removeDependencies, jsExt);
+
+  register(['buildFile'], 'init', _buildDependencies, jsExt);
   register(['postBuild'], 'init', _writeBundles);
 
   register(['preClean'], 'init', _deleteBundles);
@@ -27,44 +23,39 @@ var registration = function(mimosaConfig, register) {
 
 function _buildDependencies(mimosaConfig, options, next) {
   options.files.forEach(function(file) {
-    bundler.processFile(file.outputFileName);
+    bundler.bundleNames.forEach(function(name) {
+      var added = bundler.addToBundle(name, file.outputFileName);
+      if (added && options.lifeCycleType === 'add') {
+        bundler.writeBundleFile(name, targetDir);
+      }
+    });
   });
   next();
 }
 
 function _removeDependencies(mimosaConfig, options, next) {
   options.files.forEach(function(file) {
-    bundler.processDeletedFile(file.outputFileName);
+    bundler.bundleNames.forEach(function(name) {
+      if (bundler.removeFromBundle(name, file.outputFileName)) {
+        bundler.writeBundleFile(name, targetDir);
+      }
+    });
   });
   next();
 }
 
 function _writeBundles(mimosaConfig, options, next) {
-  var baseDir = mimosaConfig.watch.compiledJavascriptDir;
-
   bundler.bundleNames.forEach(function(name) {
-    var filename = path.resolve(baseDir, name),
-        dependencies = bundler.getBundle(name);
-    var modules = dependencies.map(function(dep) {
-      return "  '" + path.relative(baseDir, dep).replace(/\.js$/, '').split(path.sep).join('/') + "'";
-    });
-    fs.writeFileSync(filename, 'define([\n' + modules.sort().join(',\n') + '\n]);');
+    bundler.writeBundleFile(name, targetDir);
   });
-
   next();
 }
 
 function _deleteBundles(mimosaConfig, options, next) {
-  var baseDir = mimosaConfig.watch.compiledJavascriptDir;
-
   bundler.bundleNames.forEach(function(name) {
-    var filename = path.resolve(baseDir, name);
-    if (fs.existsSync(filename)) {
-      fs.unlinkSync(filename);
-    }
+    bundler.deleteBundleFile(name, targetDir);
+    bundler.clearBundle(name);
   });
-  bundler.clearBundles();
-
   next();
 }
 

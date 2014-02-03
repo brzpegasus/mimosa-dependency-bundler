@@ -1,5 +1,9 @@
 'use strict';
 
+var fs = require('fs'),
+    path = require('path'),
+    logger = require('logmimosa');
+
 function fileMatch(filename, patterns) {
   filename = filename.replace(/\\/g, '/');
 
@@ -35,29 +39,43 @@ DependencyBundler.prototype.getBundle = function(name) {
   return this.bundles[name];
 };
 
-DependencyBundler.prototype.clearBundles = function() {
-  this.bundleNames.forEach(function(name) {
-    this.bundles[name] = [];
-  }, this);
+DependencyBundler.prototype.clearBundle = function(name) {
+  this.bundles[name] = [];
 };
 
-DependencyBundler.prototype.processFile = function(filename) {
-  this.bundleNames.forEach(function(name) {
-    if (fileMatch(filename, this.patterns[name])) {
-      if (this.bundles[name].indexOf(filename) < 0) {
-        this.bundles[name].push(filename);
-      }
+DependencyBundler.prototype.addToBundle = function(name, dependency) {
+  var bundle = this.bundles[name];
+  if (fileMatch(dependency, this.patterns[name])) {
+    if (bundle.indexOf(dependency) < 0) {
+      bundle.push(dependency);
+      return true;
     }
-  }, this);
+  }
 };
 
-DependencyBundler.prototype.processDeletedFile = function(filename) {
-  this.bundleNames.forEach(function(name) {
-    var idx, dependencies = this.bundles[name];
-    if ((idx = dependencies.indexOf(filename)) > -1) {
-      dependencies.splice(idx, 1);
-    }
-  }, this);
+DependencyBundler.prototype.removeFromBundle = function(name, dependency) {
+  var idx, bundle = this.bundles[name];
+  if ((idx = bundle.indexOf(dependency)) > -1) {
+    bundle.splice(idx, 1);
+    return true;
+  }
+};
+
+DependencyBundler.prototype.writeBundleFile = function(name, targetDir) {
+  var filename = path.resolve(targetDir, name);
+  var modules = this.bundles[name].map(function(dep) {
+    return "  '" + path.relative(targetDir, dep).replace(/\.(.)+$/, '').split(path.sep).join('/') + "'";
+  });
+  fs.writeFileSync(filename, 'define([\n' + modules.sort().join(',\n') + '\n]);');
+  logger.info("[dependency-bundle] Created file [[ " + filename + " ]]");
+};
+
+DependencyBundler.prototype.deleteBundleFile = function(name, targetDir) {
+  var filename = path.resolve(targetDir, name);
+  if (fs.existsSync(filename)) {
+    fs.unlinkSync(filename);
+    logger.info("[dependency-bundle] Deleted file [[ " + filename + " ]]");
+  }
 };
 
 exports.DependencyBundler = DependencyBundler;
