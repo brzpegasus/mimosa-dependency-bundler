@@ -39,7 +39,7 @@ describe('DependencyBundler', function() {
   });
 
   describe('addToBundle', function() {
-    it('adds a dependency to the bundle if the it matches the filter criteria', function() {
+    it('adds a dependency to the bundle if it matches the filter criteria', function() {
       var filename;
       var addToBundles = function(name) {
         bundler.addToBundle('foo.js', name);
