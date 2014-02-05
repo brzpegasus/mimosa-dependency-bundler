@@ -26,7 +26,7 @@ This is useful when all you care about is to import a bunch of dependencies into
 
 ### Loading Modules in an Ember Application
 
-By far the biggest motivation for this was to to have something that would take care of loading all necessary modules up front so that they are [immediately available to Ember's resolver](http://discuss.emberjs.com/t/overriding-defaultresolver-methods/2661/9) at the time of the dependency lookup.
+By far the biggest motivation for this was to have something that would take care of loading all necessary modules up front so that they are [immediately available to Ember's resolver](http://discuss.emberjs.com/t/overriding-defaultresolver-methods/2661/9) at the time of the dependency lookup.
 
 Without mimosa-dependency-bundler, you could alternatively concatenate all dependencies into a single file and load it up with a single `<script>` tag, but it would mean regenerating this concatenated file on every file change, whereas here, you get to keep files separate during development.
 
@@ -45,7 +45,7 @@ Add `'dependency-bundler'` to your list of modules. That's all!  Mimosa will ins
 dependencyBundler: {
   bundles: [
     { name: 'modules.js', dependencies: [/app\/(components|controllers|models|routes|views)\//] },
-    { name: 'tests.js', dependencies: ['tests/unit/', 'tests/integration']}
+    { name: 'tests.js', dependencies: ['tests/unit/', 'tests/integration/']}
   ]
 }
 ```
