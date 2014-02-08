@@ -45,7 +45,7 @@ Add `'dependency-bundler'` to your list of modules. That's all!  Mimosa will ins
 dependencyBundler: {
   bundles: [
     { name: 'modules.js', dependencies: [/app\/(components|controllers|models|routes|views)\//] },
-    { name: 'tests.js', dependencies: ['tests/unit/', 'tests/integration/']}
+    { name: 'tests.js', dependencies: ['/tests/'], exclude: ['/tests/helpers/'] }
   ]
 }
 ```
@@ -54,5 +54,6 @@ For each bundle:
 
 * `name`: The path of the file to generate, relative to Mimosa's compiled directory (`watch.compiledDir`)
 * `dependencies`: An array of strings or regexes to match. Only `.js` files are considered (either plain JS or once compiled to JS)
+* `exclude`: An array of strings or regexes to match files that should be excluded from the bundle.
 
 By default, mimosa-dependency-bundler does not configure any bundles.
