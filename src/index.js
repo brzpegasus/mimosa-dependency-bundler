@@ -1,61 +1,59 @@
 'use strict';
 
-var config = require('./config');
-var bundler, targetDir;
+var config = require('./config'),
+    DependencyBundler = require('./bundler');
+
+var bundler,
+    filesToProcess = [];
 
 var registration = function(mimosaConfig, register) {
-  var jsExt = mimosaConfig.extensions.javascript,
-      bundlerConfig = mimosaConfig.dependencyBundler;
+  var js = mimosaConfig.extensions.javascript;
 
-  var DependencyBundler = require('./bundler').DependencyBundler;
-  bundler = new DependencyBundler(bundlerConfig);
+  var options = mimosaConfig.dependencyBundler;
+  options.baseDir = mimosaConfig.watch.compiledJavascriptDir;
+  options.logger = mimosaConfig.log;
 
-  targetDir = mimosaConfig.watch.compiledJavascriptDir;
+  bundler = new DependencyBundler(options);
 
-  register(['add'], 'afterCompile', _buildDependencies, jsExt);
-  register(['remove'], 'afterDelete', _removeDependencies, jsExt);
+  // Build workflows
+  register(['buildFile'], 'init', buildDependencies, js);
+  register(['postBuild'], 'init', createBundles);
 
-  register(['buildFile'], 'init', _buildDependencies, jsExt);
-  register(['postBuild'], 'init', _writeBundles);
+  // Watch workflows
+  register(['add'], 'afterCompile', addDependencies, js);
+  register(['remove'], 'afterDelete', removeDependencies, js);
 
-  register(['preClean'], 'init', _deleteBundles);
+  // Clean workflows
+  register(['preClean'], 'init', deleteBundles);
 };
 
-function _buildDependencies(mimosaConfig, options, next) {
+function addDependencies(mimosaConfig, options, next) {
+  bundler.processFiles(options.files);
+  next();
+}
+
+function removeDependencies(mimosaConfig, options, next) {
+  bundler.processDeletedFiles(options.files);
+  next();
+}
+
+function buildDependencies(mimosaConfig, options, next) {
   options.files.forEach(function(file) {
-    bundler.bundleNames.forEach(function(name) {
-      var added = bundler.addToBundle(name, file.outputFileName);
-      if (added && options.lifeCycleType === 'add') {
-        bundler.writeBundleFile(name, targetDir);
-      }
-    });
+    filesToProcess.push(file);
   });
   next();
 }
 
-function _removeDependencies(mimosaConfig, options, next) {
-  options.files.forEach(function(file) {
-    bundler.bundleNames.forEach(function(name) {
-      if (bundler.removeFromBundle(name, file.outputFileName)) {
-        bundler.writeBundleFile(name, targetDir);
-      }
-    });
-  });
+function createBundles(mimosaConfig, options, next) {
+  if (filesToProcess.length > 0) {
+    bundler.processFiles(filesToProcess);
+    filesToProcess = [];
+  }
   next();
 }
 
-function _writeBundles(mimosaConfig, options, next) {
-  bundler.bundleNames.forEach(function(name) {
-    bundler.writeBundleFile(name, targetDir);
-  });
-  next();
-}
-
-function _deleteBundles(mimosaConfig, options, next) {
-  bundler.bundleNames.forEach(function(name) {
-    bundler.deleteBundleFile(name, targetDir);
-    bundler.clearBundle(name);
-  });
+function deleteBundles(mimosaConfig, options, next) {
+  bundler.clearBundles();
   next();
 }
 

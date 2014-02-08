@@ -2,80 +2,127 @@
 
 var fs = require('fs'),
     path = require('path'),
-    logger = require('logmimosa');
+    util = require('./util');
 
-function fileMatch(filename, patterns) {
-  filename = filename.replace(/\\/g, '/');
+var logger;
 
-  return patterns.some(function(pattern) {
-    if (pattern instanceof RegExp) {
-      return pattern.test(filename);
-    } else {
-      return filename.indexOf(pattern) > -1;
-    }
-  });
-}
-
+/**
+  DependencyBundler manages one or more "bundles" of
+  AMD module dependencies.
+  @constructor
+  @class DependencyBundler
+  @param {Object} options
+*/
 var DependencyBundler = function(options) {
   options = options || {};
 
-  var bundles = {},
-      patterns = {},
-      bundleConfig = options.bundles || [];
+  var bundles = [],
+      bundleConfig = options.bundles || [],
+      baseDir = options.baseDir || __dirname;
 
   bundleConfig.forEach(function(bundle) {
-    bundles[bundle.name] = [];
-    patterns[bundle.name] = bundle.dependencies.map(function(pattern) {
-      return (typeof pattern === 'string') ? pattern.replace(/\\/g, '/') : pattern;
+    var exclude = bundle.exclude || [];
+    bundles.push({
+      filename: path.resolve(baseDir, bundle.name),
+      patterns: bundle.dependencies.map(util.normalizePattern),
+      exclude: exclude.map(util.normalizePattern),
+      dependencies: []
     });
   });
 
   this.bundles = bundles;
-  this.bundleNames = Object.keys(bundles);
-  this.patterns = patterns;
+  this.baseDir = baseDir;
+
+  logger = this.logger = options.logger;
 };
 
-DependencyBundler.prototype.getBundle = function(name) {
-  return this.bundles[name];
-};
+/**
+  Processes a group of files based on the filename patterns
+  and adds them to the matching bundles.
+  @param {Array} files
+*/
+DependencyBundler.prototype.processFiles = function(files) {
+  var baseDir = this.baseDir;
 
-DependencyBundler.prototype.clearBundle = function(name) {
-  this.bundles[name] = [];
-};
+  this.bundles.forEach(function(bundle) {
+    var patterns = bundle.patterns,
+        exclude = bundle.exclude,
+        dependencies = bundle.dependencies,
+        dirty = false;
 
-DependencyBundler.prototype.addToBundle = function(name, dependency) {
-  var bundle = this.bundles[name];
-  if (fileMatch(dependency, this.patterns[name])) {
-    if (bundle.indexOf(dependency) < 0) {
-      bundle.push(dependency);
-      return true;
+    files.forEach(function(file) {
+      var filename = util.normalizePath(file.outputFileName);
+
+      if (!util.patternMatch(filename, exclude) &&
+           util.patternMatch(filename, patterns)) {
+
+        var dep = path.relative(baseDir, file.outputFileName);
+        if (dependencies.indexOf(dep) < 0) {
+          dependencies.push(dep);
+          // If outputFileText is null, the file was most likely already
+          // processed and included in the bundle file. We just needed to
+          // reload it into the cache.
+          if (file.outputFileText !== null) {
+            dirty = true;
+          }
+        }
+      }
+    });
+
+    if (dirty) {
+      writeBundleFile(bundle);
     }
-  }
-};
-
-DependencyBundler.prototype.removeFromBundle = function(name, dependency) {
-  var idx, bundle = this.bundles[name];
-  if ((idx = bundle.indexOf(dependency)) > -1) {
-    bundle.splice(idx, 1);
-    return true;
-  }
-};
-
-DependencyBundler.prototype.writeBundleFile = function(name, targetDir) {
-  var filename = path.resolve(targetDir, name);
-  var modules = this.bundles[name].map(function(dep) {
-    return "  '" + path.relative(targetDir, dep).replace(/\.(.)+$/, '').split(path.sep).join('/') + "'";
   });
-  fs.writeFileSync(filename, 'define([\n' + modules.sort().join(',\n') + '\n]);');
-  logger.info("[dependency-bundle] Created file [[ " + filename + " ]]");
 };
 
-DependencyBundler.prototype.deleteBundleFile = function(name, targetDir) {
-  var filename = path.resolve(targetDir, name);
-  if (fs.existsSync(filename)) {
-    fs.unlinkSync(filename);
-    logger.info("[dependency-bundle] Deleted file [[ " + filename + " ]]");
+/**
+  Deletes the specified files from any of the bundles they exist in.
+  @param {Array} files
+*/
+DependencyBundler.prototype.processDeletedFiles = function(files) {
+  var baseDir = this.baseDir;
+
+  this.bundles.forEach(function(bundle) {
+    var dependencies = bundle.dependencies,
+        dirty = false;
+
+    files.forEach(function(file) {
+      var idx, dep = path.relative(baseDir, file.outputFileName);
+      if ((idx = dependencies.indexOf(dep)) > -1) {
+        dependencies.splice(idx, 1);
+        dirty = true;
+      }
+    });
+
+    if (dirty) {
+      writeBundleFile(bundle);
+    }
+  });
+};
+
+/**
+  Clears all bundles of their dependencies.
+*/
+DependencyBundler.prototype.clearBundles = function() {
+  this.bundles.forEach(function(bundle) {
+    bundle.dependencies = [];
+    deleteBundleFile(bundle);
+  });
+};
+
+function writeBundleFile(bundle) {
+  var deps = bundle.dependencies.map(function(dep) {
+    return "  '" + util.fileNameToModuleId(dep) + "'";
+  });
+  fs.writeFileSync(bundle.filename, 'define([\n' + deps.sort().join(',\n') + '\n]);');
+  logger.info("[dependency-bundler] Created file [[ " + bundle.filename + " ]]");
+}
+
+function deleteBundleFile(bundle) {
+  if (fs.existsSync(bundle.filename)) {
+    fs.unlinkSync(bundle.filename);
+    logger.info("[dependency-bundler] Deleted file [[ " + bundle.filename + " ]]");
   }
-};
+}
 
-exports.DependencyBundler = DependencyBundler;
+module.exports = DependencyBundler;
