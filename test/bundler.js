@@ -1,106 +1,120 @@
-var expect = require('chai').expect,
-    DependencyBundler = require('../lib/bundler').DependencyBundler;
+var fs = require('fs'),
+    path = require('path'),
+    expect = require('chai').expect,
+    config = require('./fixtures/config').config,
+    DependencyBundler = require('../lib/bundler');
+
+function loadFiles(dir) {
+  var files = [];
+  fs.readdirSync(dir).forEach(function(file) {
+    file = path.resolve(dir, file);
+    var stats = fs.statSync(file);
+    if (stats.isDirectory()) {
+      files = files.concat(loadFiles(file));
+    } else {
+      files.push(file);
+    }
+  });
+  return files;
+}
+
+function content(file) {
+  return fs.readFileSync(file, 'utf8');
+}
 
 describe('DependencyBundler', function() {
-  var bundler, fooBundle, barBundle,
-      bundlerConfig = {
-        bundles: [
-          {
-            name: 'foo.js',
-            dependencies: ['/foo/1/', '/foo/2', 'app\\common\\']
-          },
-          {
-            name: 'bar.js',
-            dependencies: ['/bar/', 'app/common', /^app\/bar_.+\.js/]
-          }
-        ]
-      };
+  var bundler,
+      fixturesDir = 'test/fixtures',
+      expectedDir = 'test/expected',
+      actualDir = 'test/actual';
 
-  beforeEach(function() {
-    bundler = new DependencyBundler(bundlerConfig);
-    fooBundle = bundler.getBundle('foo.js');
-    barBundle = bundler.getBundle('bar.js');
+  // Suppress logging for testing
+  var logger = {};
+  logger.error = logger.warn = logger.info = logger.debug = function() {};
+
+  before(function() {
+    var options = config.dependencyBundler;
+    options.baseDir = actualDir;
+    options.logger = logger;
+
+    bundler = new DependencyBundler(options);
+
+    // Create the compiled directory
+    if (!fs.existsSync(actualDir)) {
+      fs.mkdirSync(actualDir);
+    }
   });
 
-  it('maintains a list of dependencies for each bundle specified in the config', function() {
-    expect(fooBundle).to.be.instanceof(Array);
-    expect(barBundle).to.be.instanceof(Array);
-    expect(bundler.getBundle('baz.js')).to.not.exist;
+  after(function() {
+    // Clean up the compiled directory
+    if (fs.existsSync(actualDir)) {
+      loadFiles(actualDir).forEach(function(file) {
+        fs.unlinkSync(file);
+      });
+      fs.rmdirSync(actualDir);
+    }
   });
 
-  describe('clearBundle', function() {
-    it('clears the list of dependencies for the specified bundle', function() {
-      fooBundle.push('app/foo1/a.js', 'app/foo2/a.js');
-      expect(bundler.getBundle('foo.js')).to.have.length(2);
+  describe("processFiles", function() {
+    var foo = path.resolve(expectedDir, 'processFiles', 'foo.js'),
+        bar = path.resolve(expectedDir, 'processFiles', 'bar.js'),
+        inputFiles;
 
-      bundler.clearBundle('foo.js');
-      expect(bundler.getBundle('foo.js')).to.have.length(0);
-    });
-  });
-
-  describe('addToBundle', function() {
-    it('adds a dependency to the bundle if it matches the filter criteria', function() {
-      var filename;
-      var addToBundles = function(name) {
-        bundler.addToBundle('foo.js', name);
-        bundler.addToBundle('bar.js', name);
-      };
-
-      filename = 'app/foo/1/a.js';
-      addToBundles(filename);
-      expect(fooBundle).to.contain(filename);
-      expect(barBundle).to.not.contain(filename);
-
-      filename = 'app/bar/a.js';
-      addToBundles(filename);
-      expect(fooBundle).to.not.contain(filename);
-      expect(barBundle).to.contain(filename);
-
-      filename = 'app/bar.js';
-      addToBundles(filename);
-      expect(fooBundle).to.not.contain(filename);
-      expect(barBundle).to.not.contain(filename);
-
-      filename = 'app/bar_test.js';
-      addToBundles(filename);
-      expect(fooBundle).to.not.contain(filename);
-      expect(barBundle).to.contain(filename);
-
-      filename = 'app\\bar_test2.js';
-      addToBundles(filename);
-      expect(fooBundle).to.not.contain(filename);
-      expect(barBundle).to.contain(filename);
-
-      filename = 'app\\common\\shared.js';
-      addToBundles(filename);
-      expect(fooBundle).to.contain(filename);
-      expect(barBundle).to.contain(filename);
-
-      filename = 'a.js';
-      addToBundles(filename);
-      expect(fooBundle).to.not.contain(filename);
-      expect(barBundle).to.not.contain(filename);
-    });
-  });
-
-  describe('removeFromBundle', function() {
     before(function() {
-      fooBundle.push('app/foo/a.js', 'app/common/shared.js');
-      barBundle.push('/bar/1/a.js', 'app/common/shared.js');
+      inputFiles = loadFiles(fixturesDir).map(function(file) {
+        return { outputFileName: file.replace('fixtures', 'actual') };
+      });
     });
 
-    it('deletes a file from the list of dependencies for the matching bundle', function() {
-      var filename;
+    it("adds files to their matching bundles", function() {
+      bundler.processFiles(inputFiles);
 
-      filename = 'app/foo/a.js';
-      bundler.removeFromBundle('foo.js', filename);
-      expect(fooBundle).to.not.contain(filename);
+      var actualFoo = path.resolve(actualDir, 'foo.js');
+      expect(fs.existsSync(actualFoo)).to.be.true;
+      expect(content(actualFoo)).to.equal(content(foo));
 
-      filename = 'app/common/shared.js';
-      bundler.removeFromBundle('foo.js', filename);
-      bundler.removeFromBundle('bar.js', filename);
-      expect(fooBundle).to.not.contain(filename);
-      expect(barBundle).to.not.contain(filename);
+      var actualBar = path.resolve(actualDir, 'bar.js');
+      expect(fs.existsSync(actualBar)).to.be.true;
+      expect(content(actualBar)).to.equal(content(bar));
+    });   
+  });
+
+  describe("processDeletedFiles", function() {
+    var foo = path.resolve(expectedDir, 'processDeletedFiles', 'foo.js'),
+        bar = path.resolve(expectedDir, 'processDeletedFiles', 'bar.js'),
+        inputFiles;
+
+    before(function() {
+      inputFiles = [
+        path.resolve(fixturesDir, 'app/common/shared.js'),
+        path.resolve(fixturesDir, 'app/bar/_d.js')
+      ].map(function(file) {
+        return { outputFileName: file.replace('fixtures', 'actual') };
+      });
+    });
+
+    it("removes files from their matching bundles", function() {
+      bundler.processDeletedFiles(inputFiles);
+
+      var actualFoo = path.resolve(actualDir, 'foo.js');
+      expect(fs.existsSync(actualFoo)).to.be.true;
+      expect(content(actualFoo)).to.equal(content(foo));
+
+      var actualBar = path.resolve(actualDir, 'bar.js');
+      expect(fs.existsSync(actualBar)).to.be.true;
+      expect(content(actualBar)).to.equal(content(bar));
+    });
+  });
+
+  describe("clearBundles", function() {
+    it("deletes all bundle files", function() {
+      bundler.clearBundles();
+
+      var foo = path.resolve(actualDir, 'foo.js');
+      expect(fs.existsSync(foo)).to.be.false;
+
+      var bar = path.resolve(actualDir, 'bar.js');
+      expect(fs.existsSync(bar)).to.be.false;
     });
   });
 });
